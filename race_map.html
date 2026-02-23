@@ -1,0 +1,6031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Texas Bike Race Rainfall Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --spring-dark:  #1a6b2f;
+  --spring-mid:   #2d9e48;
+  --spring-light: #a8ddb5;
+  --fall-dark:    #8b3a00;
+  --fall-mid:     #d4640a;
+  --fall-light:   #f4b87a;
+  --bg:           #0d1117;
+  --panel:        #161b22;
+  --panel2:       #1c2128;
+  --border:       #30363d;
+  --text:         #e6edf3;
+  --muted:        #8b949e;
+  --accent:       #58a6ff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── HEADER ── */
+header { padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; flex-shrink: 0; z-index: 1000; }
+header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 2px; white-space: nowrap; }
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; flex: 1; }
+.fg { display: flex; flex-direction: column; gap: 2px; }
+.fg label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.fg select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; cursor: pointer; }
+.fg select:focus { outline: none; border-color: var(--accent); }
+.count-pill { font-size: 0.72rem; color: var(--muted); padding: 4px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; white-space: nowrap; }
+
+/* ── MAIN LAYOUT ── */
+.main { display: flex; flex: 1; overflow: hidden; }
+#map { flex: 1; height: 100%; }
+
+/* ── RIGHT PANEL ── */
+.right-panel { width: 320px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+.panel-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.panel-tab { flex: 1; padding: 10px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); cursor: pointer; text-align: center; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.panel-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.panel-content { flex: 1; overflow-y: auto; }
+
+/* ── LEGEND PANEL ── */
+.legend { padding: 14px; }
+.legend h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 1.5px; font-size: 0.95rem; margin-bottom: 12px; color: var(--muted); }
+.leg-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.leg-section:last-child { border-bottom: none; }
+.leg-section h4 { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+.leg-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.75rem; }
+.leg-sym { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.leg-sym svg { width: 100%; height: 100%; }
+.leg-note { font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+
+/* ── SUMMARY PANEL ── */
+.summary-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); text-align: center; padding: 30px; gap: 10px; }
+.summary-placeholder svg { opacity: 0.3; }
+.summary-placeholder p { font-size: 0.8rem; line-height: 1.5; }
+
+.venue-summary { padding: 16px; }
+.vs-name { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 1px; line-height: 1.2; margin-bottom: 12px; }
+.vs-name.spring { color: var(--spring-mid); }
+.vs-name.fall   { color: var(--fall-mid); }
+
+.score-block { display: flex; align-items: center; gap: 12px; background: var(--panel2); border-radius: 8px; padding: 12px; margin-bottom: 14px; border: 1px solid var(--border); }
+.grade-circle { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; flex-shrink: 0; }
+.grade-A { background: rgba(45,158,72,0.2);  color: #2d9e48; border: 2px solid #2d9e48; }
+.grade-B { background: rgba(88,166,255,0.15); color: #58a6ff; border: 2px solid #58a6ff; }
+.grade-C { background: rgba(255,166,0,0.15);  color: #ffa600; border: 2px solid #ffa600; }
+.grade-D { background: rgba(255,80,80,0.15);  color: #ff5050; border: 2px solid #ff5050; }
+.score-info { flex: 1; }
+.score-num { font-size: 1.1rem; font-weight: 600; }
+.score-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+.best-date-banner { font-size: 0.78rem; margin-top: 6px; }
+.best-date-val { font-weight: 600; }
+
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+.stat-cell { background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.stat-cell-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 3px; }
+.stat-cell-val { font-size: 0.85rem; font-weight: 500; }
+
+.sig-bar-wrap { margin-bottom: 14px; }
+.sig-bar-label { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
+.sig-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.sig-bar-fill { height: 100%; border-radius: 4px; }
+
+.section-title { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; margin-top: 14px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+
+/* bar chart */
+.bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 80px; margin-bottom: 4px; }
+.bar-wrap { display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: flex-end; gap: 2px; }
+.bar { width: 100%; border-radius: 2px 2px 0 0; min-height: 2px; transition: opacity 0.2s; cursor: default; position: relative; }
+.bar:hover::after { content: attr(data-tip); position: absolute; bottom: 105%; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--border); padding: 3px 6px; border-radius: 3px; font-size: 0.65rem; white-space: nowrap; z-index: 999; pointer-events: none; }
+.bar-month { font-size: 0.55rem; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; }
+
+/* top3 race dates */
+.top3-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.top3-item { display: flex; align-items: center; gap: 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.top3-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: var(--muted); width: 18px; }
+.top3-info { flex: 1; }
+.top3-date { font-size: 0.82rem; font-weight: 500; }
+.top3-score { font-size: 0.68rem; color: var(--muted); }
+.top3-bar { width: 40px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.top3-bar-fill { height: 100%; border-radius: 3px; }
+
+/* freeze table */
+.freeze-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; margin-bottom: 14px; }
+.freeze-table th { text-align: left; padding: 4px 6px; color: var(--muted); font-weight: 400; font-size: 0.62rem; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+.freeze-table td { padding: 4px 6px; border-bottom: 1px solid rgba(48,54,61,0.5); }
+
+/* print styles */
+@media print {
+  header, .panel-tabs { display: none !important; }
+  .main { height: auto !important; overflow: visible !important; }
+  #map { display: none !important; }
+  .right-panel { width: 100% !important; border: none !important; height: auto !important; overflow: visible !important; }
+  .panel-content { overflow: visible !important; }
+  .summary-placeholder { display: none !important; }
+  .venue-summary { page-break-after: always; }
+  body { background: white !important; color: black !important; }
+  .vs-name.spring { color: #1a6b2f !important; }
+  .vs-name.fall   { color: #8b3a00 !important; }
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.leaflet-popup-content-wrapper { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+.leaflet-popup-tip-container { display: none; }
+.leaflet-popup-content { margin: 0 !important; }
+.mini-tooltip { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-family: 'DM Sans',sans-serif; font-size: 0.78rem; color: var(--text); box-shadow: 0 4px 20px rgba(0,0,0,0.5); max-width: 220px; cursor: pointer; }
+.mini-tt-name { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 1px; margin-bottom: 4px; }
+.mini-tt-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.72rem; padding: 2px 0; }
+.mini-tt-lbl { color: var(--muted); }
+.mini-tt-click { font-size: 0.65rem; color: var(--accent); margin-top: 6px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Texas Bike Race Map</h1>
+  <div class="filter-bar">
+    <div class="fg">
+      <label>Season</label>
+      <select id="f-season" onchange="applyFilters()">
+        <option value="all">Both Seasons</option>
+        <option value="Spring">Spring Only</option>
+        <option value="Fall">Fall Only</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Symbol</label>
+      <select id="f-sym" onchange="applyFilters()">
+        <option value="all">Stars + Circles</option>
+        <option value="star">Stars (Significant)</option>
+        <option value="circle">Circles (Not Sig)</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Min Significant Windows</label>
+      <select id="f-minsig" onchange="applyFilters()">
+        <option value="0">Any</option>
+        <option value="3">3+ windows</option>
+        <option value="5">5+ windows</option>
+        <option value="8">8+ windows</option>
+        <option value="10">10+ windows</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Confidence</label>
+      <select id="f-conf" onchange="applyFilters()">
+        <option value="all">All Levels</option>
+        <option value="99%">Highly Sig (99%)</option>
+        <option value="95%">Significant (95%+)</option>
+        <option value="90%">Marginally Sig (90%+)</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Min Race Score</label>
+      <select id="f-score" onchange="applyFilters()">
+        <option value="0">Any Score</option>
+        <option value="50">50+ (C or better)</option>
+        <option value="65">65+ (B or better)</option>
+        <option value="80">80+ (A only)</option>
+      </select>
+    </div>
+    <div class="count-pill" id="count-pill">All locations</div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="map"></div>
+
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" id="tab-summary" onclick="switchTab('summary')">Venue Summary</div>
+      <div class="panel-tab" id="tab-legend" onclick="switchTab('legend')">Legend</div>
+    </div>
+    <div class="panel-content" id="panel-summary">
+      <div class="summary-placeholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>
+        <p>Click any location on the map to see its full venue summary and race date recommendations.</p>
+      </div>
+    </div>
+    <div class="panel-content" id="panel-legend" style="display:none;">
+      <div class="legend">
+        <h3>Legend</h3>
+        <div class="leg-section">
+          <h4>Season (Most Common Winner)</h4>
+          <div class="leg-item"><div class="leg-sym"><svg viewBox="0 0 26 26"><polygon points="13,1 16,9.5 25,9.5 18,15 20.5,23.5 13,18.5 5.5,23.5 8,15 1,9.5 10,9.5" fill="#2d9e48"/></svg></div>Spring — Significant</div>
+          <div class="leg-item"><div class="leg-sym"><svg viewBox="0 0 26 26"><circle cx="13" cy="13" r="10" fill="#a8ddb5"/></svg></div>Spring — Not Significant</div>
+          <div class="leg-item"><div class="leg-sym"><svg viewBox="0 0 26 26"><polygon points="13,1 16,9.5 25,9.5 18,15 20.5,23.5 13,18.5 5.5,23.5 8,15 1,9.5 10,9.5" fill="#d4640a"/></svg></div>Fall — Significant</div>
+          <div class="leg-item"><div class="leg-sym"><svg viewBox="0 0 26 26"><circle cx="13" cy="13" r="10" fill="#f4b87a"/></svg></div>Fall — Not Significant</div>
+        </div>
+        <div class="leg-section">
+          <h4>Star Size = Confidence Level</h4>
+          <div class="leg-item"><div class="leg-sym"><svg viewBox="0 0 26 26"><polygon points="13,0 16.5,9 26,9 19,14.5 21.5,23.5 13,18 4.5,23.5 7,14.5 0,9 9.5,9" fill="#2d9e48"/></svg></div>Highly Significant (99%)</div>
+          <div class="leg-item"><div class="leg-sym"><svg viewBox="0 0 26 26"><polygon points="13,3 16,10 23,10 17.5,14.5 19.5,22 13,17.5 6.5,22 8.5,14.5 3,10 10,10" fill="#2d9e48"/></svg></div>Significant (95%)</div>
+          <div class="leg-item"><div class="leg-sym"><svg viewBox="0 0 26 26"><polygon points="13,5 15.5,11 22,11 17,15 19,22 13,17.5 7,22 9,15 4,11 10.5,11" fill="#2d9e48"/></svg></div>Marginally Sig (90%)</div>
+        </div>
+        <div class="leg-section">
+          <h4>Number on Symbol</h4>
+          <div class="leg-note"><strong style="color:var(--text)">Stars:</strong> windows where location was significant<br><br><strong style="color:var(--text)">Circles:</strong> windows where it was NOT significant</div>
+        </div>
+        <div class="leg-section">
+          <h4>Color Darkness</h4>
+          <div class="leg-note">Darker = larger average rainfall margin between seasons. Lighter = smaller, less decisive difference.</div>
+        </div>
+        <div class="leg-section">
+          <h4>Race Score</h4>
+          <div class="leg-note">
+            0–100 score combining:<br>
+            Rainfall (40%) + Significance (30%) + Freeze Risk (20%) + Margin (10%)<br><br>
+            <strong style="color:#2d9e48">A</strong> = 80+&nbsp;&nbsp;
+            <strong style="color:#58a6ff">B</strong> = 65+&nbsp;&nbsp;
+            <strong style="color:#ffa600">C</strong> = 50+&nbsp;&nbsp;
+            <strong style="color:#ff5050">D</strong> = below 50
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = [
+  {
+    "name": "29 Pines - Longview, TX",
+    "lat": 32.351883,
+    "lon": -94.674411,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 6,
+    "n_not_sig": 2,
+    "n_total": 8,
+    "is_star": true,
+    "symbol_count": 6,
+    "avg_p": 0.0952,
+    "avg_margin": 28.6,
+    "dom_conf": "90%",
+    "spring_total": 281.77,
+    "fall_total": 249.72,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 62.32,
+        "avgDay": 0.104,
+        "rainyDays": 236,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 64.38,
+        "avgDay": 0.118,
+        "rainyDays": 234,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 78.63,
+        "avgDay": 0.131,
+        "rainyDays": 292,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 103.57,
+        "avgDay": 0.179,
+        "rainyDays": 275,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 39.14,
+        "avgDay": 0.065,
+        "rainyDays": 286,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 74.04,
+        "avgDay": 0.128,
+        "rainyDays": 245,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 79.41,
+        "avgDay": 0.133,
+        "rainyDays": 211,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 80.54,
+        "avgDay": 0.139,
+        "rainyDays": 222,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.0,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 9,
+        "below40": 99,
+        "avgTemp": 49.1,
+        "pct32": 1.6,
+        "pct40": 17.1
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 6,
+        "avgTemp": 59.4,
+        "pct32": 0.2,
+        "pct40": 1.0
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 69.8,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 13,
+        "avgTemp": 56.6,
+        "pct32": 0.0,
+        "pct40": 2.2
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 79,
+        "below40": 249,
+        "avgTemp": 41.6,
+        "pct32": 14.5,
+        "pct40": 45.7
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 129,
+        "below40": 334,
+        "avgTemp": 39.2,
+        "pct32": 21.6,
+        "pct40": 55.9
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 19,
+        "below40": 87,
+        "avgTemp": 49.5,
+        "pct32": 3.2,
+        "pct40": 14.5
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "4R Muenster - Gainesville, TX",
+    "lat": 33.6518,
+    "lon": -97.3764,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 0,
+    "n_not_sig": 8,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 8,
+    "avg_p": 0.6588,
+    "avg_margin": 6.16,
+    "dom_conf": "N/A",
+    "spring_total": 209.89,
+    "fall_total": 211.8,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 39.41,
+        "avgDay": 0.066,
+        "rainyDays": 166,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 39.52,
+        "avgDay": 0.073,
+        "rainyDays": 180,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 64.36,
+        "avgDay": 0.108,
+        "rainyDays": 257,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 89.01,
+        "avgDay": 0.154,
+        "rainyDays": 249,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 38.24,
+        "avgDay": 0.064,
+        "rainyDays": 222,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 61.6,
+        "avgDay": 0.107,
+        "rainyDays": 221,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 80.59,
+        "avgDay": 0.135,
+        "rainyDays": 210,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 55.04,
+        "avgDay": 0.095,
+        "rainyDays": 174,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 27,
+        "below40": 130,
+        "avgTemp": 46.8,
+        "pct32": 4.7,
+        "pct40": 22.5
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 11,
+        "avgTemp": 57.7,
+        "pct32": 0.2,
+        "pct40": 1.8
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 68.7,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 3,
+        "below40": 26,
+        "avgTemp": 54.4,
+        "pct32": 0.5,
+        "pct40": 4.5
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 137,
+        "below40": 316,
+        "avgTemp": 37.9,
+        "pct32": 25.1,
+        "pct40": 58.0
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 204,
+        "below40": 427,
+        "avgTemp": 35.4,
+        "pct32": 34.1,
+        "pct40": 71.4
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 37,
+        "below40": 138,
+        "avgTemp": 46.7,
+        "pct32": 6.2,
+        "pct40": 23.1
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "BCGB - Austin, TX",
+    "lat": 30.2439,
+    "lon": -97.8097,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 90.7,
+    "grade": "C",
+    "n_significant": 4,
+    "n_not_sig": 4,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 4,
+    "avg_p": 0.1857,
+    "avg_margin": 22.02,
+    "dom_conf": "90%",
+    "spring_total": 194.86,
+    "fall_total": 229.23,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 42.16,
+        "avgDay": 0.07,
+        "rainyDays": 205,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 40.08,
+        "avgDay": 0.074,
+        "rainyDays": 223,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 48.58,
+        "avgDay": 0.081,
+        "rainyDays": 284,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 80.14,
+        "avgDay": 0.139,
+        "rainyDays": 292,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 47.65,
+        "avgDay": 0.08,
+        "rainyDays": 248,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 61.31,
+        "avgDay": 0.106,
+        "rainyDays": 273,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 71.19,
+        "avgDay": 0.119,
+        "rainyDays": 233,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 68.49,
+        "avgDay": 0.118,
+        "rainyDays": 234,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.4,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 4,
+        "below40": 54,
+        "avgTemp": 51.8,
+        "pct32": 0.7,
+        "pct40": 9.3
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 2,
+        "avgTemp": 62.0,
+        "pct32": 0.0,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.1,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 7,
+        "avgTemp": 59.1,
+        "pct32": 0.0,
+        "pct40": 1.2
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 47,
+        "below40": 163,
+        "avgTemp": 44.6,
+        "pct32": 8.6,
+        "pct40": 29.9
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 56,
+        "below40": 247,
+        "avgTemp": 42.3,
+        "pct32": 9.4,
+        "pct40": 41.3
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 10,
+        "below40": 52,
+        "avgTemp": 52.2,
+        "pct32": 1.7,
+        "pct40": 8.7
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 90.7,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 90.7,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 65.3,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      }
+    ]
+  },
+  {
+    "name": "Big Bend Ranch State Park",
+    "lat": 29.531901955094,
+    "lon": -103.888927304026,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 82.7,
+    "grade": "D",
+    "n_significant": 8,
+    "n_not_sig": 0,
+    "n_total": 8,
+    "is_star": true,
+    "symbol_count": 8,
+    "avg_p": 0.0079,
+    "avg_margin": 20.66,
+    "dom_conf": "99%",
+    "spring_total": 25.6,
+    "fall_total": 62.17,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 9.51,
+        "avgDay": 0.016,
+        "rainyDays": 87,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 5.13,
+        "avgDay": 0.009,
+        "rainyDays": 79,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 7.41,
+        "avgDay": 0.012,
+        "rainyDays": 75,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 6.83,
+        "avgDay": 0.012,
+        "rainyDays": 102,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 20.67,
+        "avgDay": 0.035,
+        "rainyDays": 267,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 27.02,
+        "avgDay": 0.047,
+        "rainyDays": 188,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 11.89,
+        "avgDay": 0.02,
+        "rainyDays": 121,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 8.25,
+        "avgDay": 0.014,
+        "rainyDays": 74,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 69.4,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 12,
+        "below40": 100,
+        "avgTemp": 46.4,
+        "pct32": 2.1,
+        "pct40": 17.3
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 10,
+        "avgTemp": 56.2,
+        "pct32": 0.0,
+        "pct40": 1.7
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 64.3,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 1,
+        "below40": 19,
+        "avgTemp": 54.0,
+        "pct32": 0.2,
+        "pct40": 3.3
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 69,
+        "below40": 245,
+        "avgTemp": 40.7,
+        "pct32": 12.7,
+        "pct40": 45.0
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 113,
+        "below40": 354,
+        "avgTemp": 38.1,
+        "pct32": 18.9,
+        "pct40": 59.2
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 15,
+        "below40": 106,
+        "avgTemp": 47.1,
+        "pct32": 2.5,
+        "pct40": 17.7
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 82.7,
+        "rain_score": 0,
+        "sig_score": 100.0,
+        "freeze_score": 96.7
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 82.7,
+        "rain_score": 0,
+        "sig_score": 100.0,
+        "freeze_score": 96.7
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 58.8,
+        "rain_score": 0,
+        "sig_score": 100.0,
+        "freeze_score": 96.7
+      }
+    ]
+  },
+  {
+    "name": "Big Cedar",
+    "lat": 32.62254,
+    "lon": -96.9787,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 0,
+    "n_not_sig": 8,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 8,
+    "avg_p": 0.4376,
+    "avg_margin": 12.05,
+    "dom_conf": "N/A",
+    "spring_total": 230.26,
+    "fall_total": 218.75,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 46.55,
+        "avgDay": 0.078,
+        "rainyDays": 189,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 48.37,
+        "avgDay": 0.089,
+        "rainyDays": 191,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 68.6,
+        "avgDay": 0.115,
+        "rainyDays": 274,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 88.58,
+        "avgDay": 0.153,
+        "rainyDays": 285,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 36.73,
+        "avgDay": 0.061,
+        "rainyDays": 225,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 52.2,
+        "avgDay": 0.09,
+        "rainyDays": 216,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 76.87,
+        "avgDay": 0.129,
+        "rainyDays": 214,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 71.58,
+        "avgDay": 0.124,
+        "rainyDays": 193,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 77.7,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 9,
+        "below40": 83,
+        "avgTemp": 49.7,
+        "pct32": 1.6,
+        "pct40": 14.3
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 4,
+        "avgTemp": 60.2,
+        "pct32": 0.2,
+        "pct40": 0.7
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.8,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 13,
+        "avgTemp": 57.1,
+        "pct32": 0.0,
+        "pct40": 2.2
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 81,
+        "below40": 247,
+        "avgTemp": 41.2,
+        "pct32": 14.9,
+        "pct40": 45.3
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 117,
+        "below40": 341,
+        "avgTemp": 38.9,
+        "pct32": 19.6,
+        "pct40": 57.0
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 20,
+        "below40": 88,
+        "avgTemp": 49.6,
+        "pct32": 3.3,
+        "pct40": 14.7
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Bridgeport - Decatur, TX",
+    "lat": 33.2101,
+    "lon": -97.7548,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 0,
+    "n_not_sig": 8,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 8,
+    "avg_p": 0.6047,
+    "avg_margin": 6.38,
+    "dom_conf": "N/A",
+    "spring_total": 193.33,
+    "fall_total": 198.54,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 37.22,
+        "avgDay": 0.062,
+        "rainyDays": 165,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 38.32,
+        "avgDay": 0.07,
+        "rainyDays": 169,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 57.08,
+        "avgDay": 0.095,
+        "rainyDays": 249,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 79.26,
+        "avgDay": 0.137,
+        "rainyDays": 246,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 34.13,
+        "avgDay": 0.057,
+        "rainyDays": 224,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 52.3,
+        "avgDay": 0.09,
+        "rainyDays": 209,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 80.86,
+        "avgDay": 0.135,
+        "rainyDays": 192,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 52.97,
+        "avgDay": 0.091,
+        "rainyDays": 180,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 77.0,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 21,
+        "below40": 114,
+        "avgTemp": 47.5,
+        "pct32": 3.6,
+        "pct40": 19.7
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 8,
+        "avgTemp": 58.5,
+        "pct32": 0.2,
+        "pct40": 1.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 69.5,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 1,
+        "below40": 24,
+        "avgTemp": 55.3,
+        "pct32": 0.2,
+        "pct40": 4.2
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 120,
+        "below40": 303,
+        "avgTemp": 38.9,
+        "pct32": 22.0,
+        "pct40": 55.6
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 176,
+        "below40": 417,
+        "avgTemp": 36.3,
+        "pct32": 29.4,
+        "pct40": 69.7
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 34,
+        "below40": 122,
+        "avgTemp": 47.6,
+        "pct32": 5.7,
+        "pct40": 20.4
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Dinosaur Valley State Park",
+    "lat": 32.2532,
+    "lon": -97.8096,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 0,
+    "n_not_sig": 8,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 8,
+    "avg_p": 0.5582,
+    "avg_margin": 7.49,
+    "dom_conf": "N/A",
+    "spring_total": 193.91,
+    "fall_total": 187.46,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 40.93,
+        "avgDay": 0.068,
+        "rainyDays": 172,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 38.35,
+        "avgDay": 0.07,
+        "rainyDays": 185,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 58.28,
+        "avgDay": 0.097,
+        "rainyDays": 253,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 74.01,
+        "avgDay": 0.128,
+        "rainyDays": 257,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 35.42,
+        "avgDay": 0.059,
+        "rainyDays": 227,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 44.48,
+        "avgDay": 0.077,
+        "rainyDays": 209,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 67.31,
+        "avgDay": 0.113,
+        "rainyDays": 192,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 57.0,
+        "avgDay": 0.098,
+        "rainyDays": 186,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 77.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 13,
+        "below40": 99,
+        "avgTemp": 49.0,
+        "pct32": 2.2,
+        "pct40": 17.1
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 8,
+        "avgTemp": 59.6,
+        "pct32": 0.2,
+        "pct40": 1.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.1,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 17,
+        "avgTemp": 56.7,
+        "pct32": 0.0,
+        "pct40": 2.9
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 90,
+        "below40": 257,
+        "avgTemp": 40.8,
+        "pct32": 16.5,
+        "pct40": 47.2
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 130,
+        "below40": 355,
+        "avgTemp": 38.5,
+        "pct32": 21.7,
+        "pct40": 59.4
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 26,
+        "below40": 100,
+        "avgTemp": 49.2,
+        "pct32": 4.3,
+        "pct40": 16.7
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Flat Rock Ranch - Comfort, TX",
+    "lat": 30.01509,
+    "lon": -98.870531,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 85.6,
+    "grade": "D",
+    "n_significant": 5,
+    "n_not_sig": 3,
+    "n_total": 8,
+    "is_star": true,
+    "symbol_count": 5,
+    "avg_p": 0.1296,
+    "avg_margin": 19.29,
+    "dom_conf": "90%",
+    "spring_total": 149.33,
+    "fall_total": 187.07,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 31.48,
+        "avgDay": 0.053,
+        "rainyDays": 183,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 34.92,
+        "avgDay": 0.064,
+        "rainyDays": 203,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 43.15,
+        "avgDay": 0.072,
+        "rainyDays": 264,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 55.33,
+        "avgDay": 0.096,
+        "rainyDays": 284,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 35.49,
+        "avgDay": 0.059,
+        "rainyDays": 253,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 56.88,
+        "avgDay": 0.098,
+        "rainyDays": 278,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 64.41,
+        "avgDay": 0.108,
+        "rainyDays": 233,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 49.69,
+        "avgDay": 0.086,
+        "rainyDays": 229,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 73.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 8,
+        "below40": 78,
+        "avgTemp": 49.8,
+        "pct32": 1.4,
+        "pct40": 13.5
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 5,
+        "avgTemp": 59.8,
+        "pct32": 0.2,
+        "pct40": 0.8
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 68.4,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 14,
+        "avgTemp": 57.1,
+        "pct32": 0.0,
+        "pct40": 2.4
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 66,
+        "below40": 196,
+        "avgTemp": 43.1,
+        "pct32": 12.1,
+        "pct40": 36.0
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 77,
+        "below40": 289,
+        "avgTemp": 40.8,
+        "pct32": 12.9,
+        "pct40": 48.3
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 19,
+        "below40": 72,
+        "avgTemp": 50.5,
+        "pct32": 3.2,
+        "pct40": 12.0
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 85.6,
+        "rain_score": 0,
+        "sig_score": 62.5,
+        "freeze_score": 97.6
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 85.6,
+        "rain_score": 0,
+        "sig_score": 62.5,
+        "freeze_score": 97.6
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 61.7,
+        "rain_score": 0,
+        "sig_score": 62.5,
+        "freeze_score": 97.6
+      }
+    ]
+  },
+  {
+    "name": "H.W. Lewis Ranch",
+    "lat": 29.8066888736311,
+    "lon": -99.7675356847165,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 88.5,
+    "grade": "C",
+    "n_significant": 6,
+    "n_not_sig": 2,
+    "n_total": 8,
+    "is_star": true,
+    "symbol_count": 6,
+    "avg_p": 0.1584,
+    "avg_margin": 21.04,
+    "dom_conf": "90%",
+    "spring_total": 140.43,
+    "fall_total": 182.88,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 27.86,
+        "avgDay": 0.047,
+        "rainyDays": 185,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 26.78,
+        "avgDay": 0.049,
+        "rainyDays": 195,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 46.73,
+        "avgDay": 0.078,
+        "rainyDays": 272,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 53.95,
+        "avgDay": 0.093,
+        "rainyDays": 284,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 36.02,
+        "avgDay": 0.06,
+        "rainyDays": 247,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 62.74,
+        "avgDay": 0.109,
+        "rainyDays": 289,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 57.88,
+        "avgDay": 0.097,
+        "rainyDays": 245,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 45.73,
+        "avgDay": 0.079,
+        "rainyDays": 224,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 73.4,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 2,
+        "below40": 58,
+        "avgTemp": 50.9,
+        "pct32": 0.3,
+        "pct40": 10.0
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 7,
+        "avgTemp": 60.7,
+        "pct32": 0.0,
+        "pct40": 1.2
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 68.7,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 10,
+        "avgTemp": 58.3,
+        "pct32": 0.0,
+        "pct40": 1.7
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 44,
+        "below40": 158,
+        "avgTemp": 44.7,
+        "pct32": 8.1,
+        "pct40": 29.0
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 58,
+        "below40": 222,
+        "avgTemp": 42.4,
+        "pct32": 9.7,
+        "pct40": 37.1
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 13,
+        "below40": 51,
+        "avgTemp": 51.6,
+        "pct32": 2.2,
+        "pct40": 8.5
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 88.5,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 98.3
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 88.5,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 98.3
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 63.9,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 98.3
+      }
+    ]
+  },
+  {
+    "name": "Hope Elizabeth Foundatino",
+    "lat": 32.1142198700488,
+    "lon": -97.6223480416876,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 0,
+    "n_not_sig": 8,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 8,
+    "avg_p": 0.5927,
+    "avg_margin": 7.12,
+    "dom_conf": "N/A",
+    "spring_total": 198.47,
+    "fall_total": 190.23,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 42.64,
+        "avgDay": 0.071,
+        "rainyDays": 178,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 40.24,
+        "avgDay": 0.074,
+        "rainyDays": 185,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 60.85,
+        "avgDay": 0.102,
+        "rainyDays": 259,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 76.36,
+        "avgDay": 0.132,
+        "rainyDays": 268,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 31.36,
+        "avgDay": 0.052,
+        "rainyDays": 223,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 45.99,
+        "avgDay": 0.08,
+        "rainyDays": 211,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 68.17,
+        "avgDay": 0.114,
+        "rainyDays": 209,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 60.78,
+        "avgDay": 0.105,
+        "rainyDays": 200,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.9,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 14,
+        "below40": 95,
+        "avgTemp": 49.0,
+        "pct32": 2.4,
+        "pct40": 16.4
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 7,
+        "avgTemp": 59.6,
+        "pct32": 0.2,
+        "pct40": 1.2
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.1,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 17,
+        "avgTemp": 56.6,
+        "pct32": 0.0,
+        "pct40": 2.9
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 85,
+        "below40": 255,
+        "avgTemp": 40.9,
+        "pct32": 15.6,
+        "pct40": 46.8
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 130,
+        "below40": 348,
+        "avgTemp": 38.6,
+        "pct32": 21.7,
+        "pct40": 58.2
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 24,
+        "below40": 96,
+        "avgTemp": 49.2,
+        "pct32": 4.0,
+        "pct40": 16.1
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Huntsville SP - Huntsville, TX",
+    "lat": 30.62611,
+    "lon": -95.527411,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 1,
+    "n_not_sig": 7,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 7,
+    "avg_p": 0.6036,
+    "avg_margin": 9.08,
+    "dom_conf": "90%",
+    "spring_total": 262.15,
+    "fall_total": 252.54,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 63.72,
+        "avgDay": 0.107,
+        "rainyDays": 246,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 59.29,
+        "avgDay": 0.109,
+        "rainyDays": 255,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 65.57,
+        "avgDay": 0.11,
+        "rainyDays": 290,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 101.28,
+        "avgDay": 0.175,
+        "rainyDays": 298,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 55.77,
+        "avgDay": 0.093,
+        "rainyDays": 330,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 67.38,
+        "avgDay": 0.117,
+        "rainyDays": 299,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 74.19,
+        "avgDay": 0.124,
+        "rainyDays": 231,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 77.45,
+        "avgDay": 0.134,
+        "rainyDays": 254,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 75.9,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 1,
+        "below40": 39,
+        "avgTemp": 52.5,
+        "pct32": 0.2,
+        "pct40": 6.7
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 2,
+        "avgTemp": 62.2,
+        "pct32": 0.0,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 3,
+        "avgTemp": 59.5,
+        "pct32": 0.0,
+        "pct40": 0.5
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 35,
+        "below40": 143,
+        "avgTemp": 45.7,
+        "pct32": 6.4,
+        "pct40": 26.2
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 51,
+        "below40": 223,
+        "avgTemp": 43.3,
+        "pct32": 8.5,
+        "pct40": 37.3
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 10,
+        "below40": 43,
+        "avgTemp": 52.7,
+        "pct32": 1.7,
+        "pct40": 7.2
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Isle du Bois",
+    "lat": 33.3763,
+    "lon": -97.0206,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 87.8,
+    "grade": "D",
+    "n_significant": 0,
+    "n_not_sig": 8,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 8,
+    "avg_p": 0.6439,
+    "avg_margin": 6.44,
+    "dom_conf": "N/A",
+    "spring_total": 226.18,
+    "fall_total": 229.64,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 45.5,
+        "avgDay": 0.076,
+        "rainyDays": 162,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 47.51,
+        "avgDay": 0.087,
+        "rainyDays": 190,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 69.47,
+        "avgDay": 0.116,
+        "rainyDays": 257,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 86.1,
+        "avgDay": 0.149,
+        "rainyDays": 265,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 35.41,
+        "avgDay": 0.059,
+        "rainyDays": 220,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 67.64,
+        "avgDay": 0.117,
+        "rainyDays": 216,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 82.74,
+        "avgDay": 0.138,
+        "rainyDays": 210,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 67.65,
+        "avgDay": 0.117,
+        "rainyDays": 196,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 77.5,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 12,
+        "below40": 93,
+        "avgTemp": 48.6,
+        "pct32": 2.1,
+        "pct40": 16.1
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 4,
+        "avgTemp": 59.3,
+        "pct32": 0.2,
+        "pct40": 0.7
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 11,
+        "avgTemp": 56.2,
+        "pct32": 0.0,
+        "pct40": 1.9
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 103,
+        "below40": 275,
+        "avgTemp": 39.8,
+        "pct32": 18.9,
+        "pct40": 50.5
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 147,
+        "below40": 392,
+        "avgTemp": 37.2,
+        "pct32": 24.6,
+        "pct40": 65.6
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 22,
+        "below40": 99,
+        "avgTemp": 48.5,
+        "pct32": 3.7,
+        "pct40": 16.6
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 87.8,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 98.1
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 87.8,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 98.1
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 63.2,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 98.1
+      }
+    ]
+  },
+  {
+    "name": "Kerrville, TX",
+    "lat": 30.010207,
+    "lon": -99.121278,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 87.0,
+    "grade": "D",
+    "n_significant": 2,
+    "n_not_sig": 6,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 6,
+    "avg_p": 0.1883,
+    "avg_margin": 15.95,
+    "dom_conf": "95%",
+    "spring_total": 143.55,
+    "fall_total": 176.95,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 28.56,
+        "avgDay": 0.048,
+        "rainyDays": 185,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 32.93,
+        "avgDay": 0.06,
+        "rainyDays": 200,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 44.89,
+        "avgDay": 0.075,
+        "rainyDays": 272,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 52.7,
+        "avgDay": 0.091,
+        "rainyDays": 285,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 34.19,
+        "avgDay": 0.057,
+        "rainyDays": 258,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 55.74,
+        "avgDay": 0.096,
+        "rainyDays": 263,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 59.17,
+        "avgDay": 0.099,
+        "rainyDays": 236,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 48.38,
+        "avgDay": 0.084,
+        "rainyDays": 224,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 73.1,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 8,
+        "below40": 80,
+        "avgTemp": 49.7,
+        "pct32": 1.4,
+        "pct40": 13.8
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 5,
+        "avgTemp": 59.7,
+        "pct32": 0.2,
+        "pct40": 0.8
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 68.3,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 13,
+        "avgTemp": 57.1,
+        "pct32": 0.0,
+        "pct40": 2.2
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 64,
+        "below40": 195,
+        "avgTemp": 43.1,
+        "pct32": 11.7,
+        "pct40": 35.8
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 77,
+        "below40": 282,
+        "avgTemp": 40.9,
+        "pct32": 12.9,
+        "pct40": 47.2
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 19,
+        "below40": 70,
+        "avgTemp": 50.4,
+        "pct32": 3.2,
+        "pct40": 11.7
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 87.0,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 97.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 87.0,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 97.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 62.4,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 97.8
+      }
+    ]
+  },
+  {
+    "name": "Lyndsey Park",
+    "lat": 32.31092,
+    "lon": -95.3748,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 6,
+    "n_not_sig": 2,
+    "n_total": 8,
+    "is_star": true,
+    "symbol_count": 6,
+    "avg_p": 0.0763,
+    "avg_margin": 28.54,
+    "dom_conf": "95%",
+    "spring_total": 270.65,
+    "fall_total": 233.39,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 59.71,
+        "avgDay": 0.1,
+        "rainyDays": 219,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 60.29,
+        "avgDay": 0.111,
+        "rainyDays": 229,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 73.28,
+        "avgDay": 0.123,
+        "rainyDays": 291,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 102.45,
+        "avgDay": 0.177,
+        "rainyDays": 272,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 39.21,
+        "avgDay": 0.066,
+        "rainyDays": 269,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 61.67,
+        "avgDay": 0.107,
+        "rainyDays": 240,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 77.46,
+        "avgDay": 0.13,
+        "rainyDays": 210,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 74.93,
+        "avgDay": 0.129,
+        "rainyDays": 223,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.3,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 12,
+        "below40": 102,
+        "avgTemp": 49.0,
+        "pct32": 2.1,
+        "pct40": 17.6
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 5,
+        "avgTemp": 59.5,
+        "pct32": 0.2,
+        "pct40": 0.8
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.0,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 16,
+        "avgTemp": 56.3,
+        "pct32": 0.0,
+        "pct40": 2.8
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 83,
+        "below40": 255,
+        "avgTemp": 41.3,
+        "pct32": 15.2,
+        "pct40": 46.8
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 124,
+        "below40": 347,
+        "avgTemp": 39.0,
+        "pct32": 20.7,
+        "pct40": 58.0
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 20,
+        "below40": 89,
+        "avgTemp": 49.3,
+        "pct32": 3.3,
+        "pct40": 14.9
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 75.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Mary Moore Searight",
+    "lat": 30.162884,
+    "lon": -97.807706,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 89.9,
+    "grade": "C",
+    "n_significant": 4,
+    "n_not_sig": 4,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 4,
+    "avg_p": 0.1868,
+    "avg_margin": 22.47,
+    "dom_conf": "90%",
+    "spring_total": 194.76,
+    "fall_total": 229.8,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 42.09,
+        "avgDay": 0.07,
+        "rainyDays": 205,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 39.89,
+        "avgDay": 0.073,
+        "rainyDays": 223,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 48.83,
+        "avgDay": 0.082,
+        "rainyDays": 285,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 80.06,
+        "avgDay": 0.139,
+        "rainyDays": 292,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 47.24,
+        "avgDay": 0.079,
+        "rainyDays": 247,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 61.49,
+        "avgDay": 0.106,
+        "rainyDays": 277,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 71.42,
+        "avgDay": 0.119,
+        "rainyDays": 236,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 69.06,
+        "avgDay": 0.119,
+        "rainyDays": 233,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.3,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 5,
+        "below40": 56,
+        "avgTemp": 51.8,
+        "pct32": 0.9,
+        "pct40": 9.7
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 2,
+        "avgTemp": 61.9,
+        "pct32": 0.0,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.0,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 8,
+        "avgTemp": 59.0,
+        "pct32": 0.0,
+        "pct40": 1.4
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 44,
+        "below40": 168,
+        "avgTemp": 44.5,
+        "pct32": 8.1,
+        "pct40": 30.8
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 58,
+        "below40": 250,
+        "avgTemp": 42.3,
+        "pct32": 9.7,
+        "pct40": 41.8
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 10,
+        "below40": 54,
+        "avgTemp": 52.2,
+        "pct32": 1.7,
+        "pct40": 9.0
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 89.9,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.6
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 89.9,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.6
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 64.6,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.6
+      }
+    ]
+  },
+  {
+    "name": "Millican - Bryan/College Sta, TX",
+    "lat": 30.480568,
+    "lon": -96.248311,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 1,
+    "n_not_sig": 7,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 7,
+    "avg_p": 0.632,
+    "avg_margin": 7.3,
+    "dom_conf": "90%",
+    "spring_total": 234.99,
+    "fall_total": 231.6,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 53.38,
+        "avgDay": 0.089,
+        "rainyDays": 244,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 55.58,
+        "avgDay": 0.102,
+        "rainyDays": 242,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 59.9,
+        "avgDay": 0.1,
+        "rainyDays": 285,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 91.04,
+        "avgDay": 0.158,
+        "rainyDays": 286,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 52.5,
+        "avgDay": 0.088,
+        "rainyDays": 311,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 57.82,
+        "avgDay": 0.1,
+        "rainyDays": 277,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 69.24,
+        "avgDay": 0.116,
+        "rainyDays": 227,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 74.76,
+        "avgDay": 0.129,
+        "rainyDays": 255,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.5,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 6,
+        "below40": 64,
+        "avgTemp": 51.8,
+        "pct32": 1.0,
+        "pct40": 11.1
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 4,
+        "avgTemp": 61.8,
+        "pct32": 0.0,
+        "pct40": 0.7
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.4,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 6,
+        "avgTemp": 58.9,
+        "pct32": 0.0,
+        "pct40": 1.0
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 40,
+        "below40": 173,
+        "avgTemp": 44.7,
+        "pct32": 7.3,
+        "pct40": 31.7
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 67,
+        "below40": 258,
+        "avgTemp": 42.5,
+        "pct32": 11.2,
+        "pct40": 43.1
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 10,
+        "below40": 62,
+        "avgTemp": 52.1,
+        "pct32": 1.7,
+        "pct40": 10.4
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Muleshoe Bend State Park",
+    "lat": 30.4867,
+    "lon": -98.099,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 90.7,
+    "grade": "C",
+    "n_significant": 4,
+    "n_not_sig": 4,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 4,
+    "avg_p": 0.1375,
+    "avg_margin": 21.85,
+    "dom_conf": "90%",
+    "spring_total": 169.05,
+    "fall_total": 202.98,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 36.7,
+        "avgDay": 0.061,
+        "rainyDays": 196,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 36.36,
+        "avgDay": 0.067,
+        "rainyDays": 208,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 44.85,
+        "avgDay": 0.075,
+        "rainyDays": 260,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 66.95,
+        "avgDay": 0.116,
+        "rainyDays": 275,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 37.7,
+        "avgDay": 0.063,
+        "rainyDays": 261,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 57.62,
+        "avgDay": 0.1,
+        "rainyDays": 245,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 67.34,
+        "avgDay": 0.113,
+        "rainyDays": 229,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 57.28,
+        "avgDay": 0.099,
+        "rainyDays": 221,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 5,
+        "below40": 50,
+        "avgTemp": 51.7,
+        "pct32": 0.9,
+        "pct40": 8.6
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 2,
+        "avgTemp": 61.8,
+        "pct32": 0.0,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.8,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 7,
+        "avgTemp": 59.1,
+        "pct32": 0.0,
+        "pct40": 1.2
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 56,
+        "below40": 165,
+        "avgTemp": 44.4,
+        "pct32": 10.3,
+        "pct40": 30.3
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 62,
+        "below40": 254,
+        "avgTemp": 42.1,
+        "pct32": 10.4,
+        "pct40": 42.5
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 11,
+        "below40": 56,
+        "avgTemp": 52.1,
+        "pct32": 1.8,
+        "pct40": 9.4
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 90.7,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 90.7,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 65.3,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      }
+    ]
+  },
+  {
+    "name": "O. P. Schnabel Park",
+    "lat": 29.53219,
+    "lon": -98.6442,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 91.4,
+    "grade": "B",
+    "n_significant": 3,
+    "n_not_sig": 5,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 5,
+    "avg_p": 0.1907,
+    "avg_margin": 20.03,
+    "dom_conf": "90%",
+    "spring_total": 177.34,
+    "fall_total": 213.23,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 40.02,
+        "avgDay": 0.067,
+        "rainyDays": 208,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 37.54,
+        "avgDay": 0.069,
+        "rainyDays": 218,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 49.96,
+        "avgDay": 0.084,
+        "rainyDays": 291,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 65.79,
+        "avgDay": 0.114,
+        "rainyDays": 298,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 44.49,
+        "avgDay": 0.074,
+        "rainyDays": 271,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 72.22,
+        "avgDay": 0.125,
+        "rainyDays": 302,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 64.24,
+        "avgDay": 0.107,
+        "rainyDays": 245,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 59.94,
+        "avgDay": 0.104,
+        "rainyDays": 239,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 75.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 1,
+        "below40": 43,
+        "avgTemp": 52.2,
+        "pct32": 0.2,
+        "pct40": 7.4
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 3,
+        "avgTemp": 62.2,
+        "pct32": 0.0,
+        "pct40": 0.5
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.7,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 5,
+        "avgTemp": 59.4,
+        "pct32": 0.0,
+        "pct40": 0.9
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 38,
+        "below40": 147,
+        "avgTemp": 45.4,
+        "pct32": 7.0,
+        "pct40": 27.0
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 46,
+        "below40": 228,
+        "avgTemp": 43.0,
+        "pct32": 7.7,
+        "pct40": 38.1
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 8,
+        "below40": 43,
+        "avgTemp": 52.8,
+        "pct32": 1.3,
+        "pct40": 7.2
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 91.4,
+        "rain_score": 0,
+        "sig_score": 37.5,
+        "freeze_score": 99.1
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 91.4,
+        "rain_score": 0,
+        "sig_score": 37.5,
+        "freeze_score": 99.1
+      },
+      {
+        "month": "March",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 68.2,
+        "rain_score": 0,
+        "sig_score": 37.5,
+        "freeze_score": 92.8
+      }
+    ]
+  },
+  {
+    "name": "Pace Bend State Park",
+    "lat": 30.4594,
+    "lon": -98.0197,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 90.7,
+    "grade": "C",
+    "n_significant": 4,
+    "n_not_sig": 4,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 4,
+    "avg_p": 0.1349,
+    "avg_margin": 22.16,
+    "dom_conf": "90%",
+    "spring_total": 170.03,
+    "fall_total": 204.17,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 36.79,
+        "avgDay": 0.062,
+        "rainyDays": 196,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 36.57,
+        "avgDay": 0.067,
+        "rainyDays": 209,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 44.52,
+        "avgDay": 0.074,
+        "rainyDays": 257,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 67.97,
+        "avgDay": 0.118,
+        "rainyDays": 279,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 39.35,
+        "avgDay": 0.066,
+        "rainyDays": 264,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 57.6,
+        "avgDay": 0.1,
+        "rainyDays": 249,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 67.31,
+        "avgDay": 0.113,
+        "rainyDays": 232,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 56.87,
+        "avgDay": 0.098,
+        "rainyDays": 216,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.0,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 4,
+        "below40": 50,
+        "avgTemp": 51.7,
+        "pct32": 0.7,
+        "pct40": 8.6
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 2,
+        "avgTemp": 61.7,
+        "pct32": 0.0,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.7,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 7,
+        "avgTemp": 59.0,
+        "pct32": 0.0,
+        "pct40": 1.2
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 49,
+        "below40": 166,
+        "avgTemp": 44.3,
+        "pct32": 9.0,
+        "pct40": 30.5
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 59,
+        "below40": 253,
+        "avgTemp": 42.1,
+        "pct32": 9.9,
+        "pct40": 42.3
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 11,
+        "below40": 54,
+        "avgTemp": 52.0,
+        "pct32": 1.8,
+        "pct40": 9.0
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 90.7,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 90.7,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 65.3,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.8
+      }
+    ]
+  },
+  {
+    "name": "Palo Duro Canyon - Amarillo, TX",
+    "lat": 34.938327,
+    "lon": -101.648534,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 40.0,
+    "grade": "D",
+    "n_significant": 8,
+    "n_not_sig": 0,
+    "n_total": 8,
+    "is_star": true,
+    "symbol_count": 8,
+    "avg_p": 0.0088,
+    "avg_margin": 22.31,
+    "dom_conf": "99%",
+    "spring_total": 75.52,
+    "fall_total": 113.64,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 17.71,
+        "avgDay": 0.03,
+        "rainyDays": 124,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 13.55,
+        "avgDay": 0.025,
+        "rainyDays": 117,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 23.21,
+        "avgDay": 0.039,
+        "rainyDays": 198,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 29.37,
+        "avgDay": 0.051,
+        "rainyDays": 195,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 41.14,
+        "avgDay": 0.069,
+        "rainyDays": 286,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 38.17,
+        "avgDay": 0.066,
+        "rainyDays": 217,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 27.78,
+        "avgDay": 0.046,
+        "rainyDays": 144,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 24.03,
+        "avgDay": 0.042,
+        "rainyDays": 130,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.5,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 77,
+        "below40": 259,
+        "avgTemp": 41.3,
+        "pct32": 13.3,
+        "pct40": 44.7
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 9,
+        "below40": 40,
+        "avgTemp": 52.3,
+        "pct32": 1.5,
+        "pct40": 6.7
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 1,
+        "avgTemp": 63.8,
+        "pct32": 0.0,
+        "pct40": 0.2
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 10,
+        "below40": 87,
+        "avgTemp": 49.1,
+        "pct32": 1.7,
+        "pct40": 15.1
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 241,
+        "below40": 423,
+        "avgTemp": 33.2,
+        "pct32": 44.2,
+        "pct40": 77.6
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 328,
+        "below40": 515,
+        "avgTemp": 31.1,
+        "pct32": 54.8,
+        "pct40": 86.1
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 97,
+        "below40": 272,
+        "avgTemp": 40.7,
+        "pct32": 16.2,
+        "pct40": 45.5
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 40,
+        "rain_score": 0,
+        "sig_score": 100.0,
+        "freeze_score": 84.9
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 40,
+        "rain_score": 0,
+        "sig_score": 100.0,
+        "freeze_score": 84.9
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 40,
+        "rain_score": 0,
+        "sig_score": 100.0,
+        "freeze_score": 84.9
+      }
+    ]
+  },
+  {
+    "name": "Quanah Hill",
+    "lat": 32.7851,
+    "lon": -97.696504930682,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 0,
+    "n_not_sig": 8,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 8,
+    "avg_p": 0.5039,
+    "avg_margin": 8.85,
+    "dom_conf": "N/A",
+    "spring_total": 200.82,
+    "fall_total": 197.14,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 37.93,
+        "avgDay": 0.063,
+        "rainyDays": 171,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 40.38,
+        "avgDay": 0.074,
+        "rainyDays": 182,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 58.87,
+        "avgDay": 0.098,
+        "rainyDays": 243,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 80.19,
+        "avgDay": 0.139,
+        "rainyDays": 260,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 37.76,
+        "avgDay": 0.063,
+        "rainyDays": 229,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 47.1,
+        "avgDay": 0.081,
+        "rainyDays": 222,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 74.72,
+        "avgDay": 0.125,
+        "rainyDays": 210,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 58.12,
+        "avgDay": 0.1,
+        "rainyDays": 185,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.8,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 16,
+        "below40": 109,
+        "avgTemp": 48.3,
+        "pct32": 2.8,
+        "pct40": 18.8
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 7,
+        "avgTemp": 58.9,
+        "pct32": 0.2,
+        "pct40": 1.2
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 69.6,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 20,
+        "avgTemp": 55.9,
+        "pct32": 0.0,
+        "pct40": 3.5
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 106,
+        "below40": 278,
+        "avgTemp": 39.8,
+        "pct32": 19.4,
+        "pct40": 51.0
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 148,
+        "below40": 384,
+        "avgTemp": 37.5,
+        "pct32": 24.7,
+        "pct40": 64.2
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 28,
+        "below40": 106,
+        "avgTemp": 48.4,
+        "pct32": 4.7,
+        "pct40": 17.7
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 0.0,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Rally Ready Race Track",
+    "lat": 29.9990392649665,
+    "lon": -97.551178690323,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 91.4,
+    "grade": "B",
+    "n_significant": 1,
+    "n_not_sig": 7,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 7,
+    "avg_p": 0.3707,
+    "avg_margin": 13.52,
+    "dom_conf": "90%",
+    "spring_total": 202.54,
+    "fall_total": 222.93,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 46.68,
+        "avgDay": 0.078,
+        "rainyDays": 221,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 39.13,
+        "avgDay": 0.072,
+        "rainyDays": 231,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 50.95,
+        "avgDay": 0.085,
+        "rainyDays": 301,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 80.14,
+        "avgDay": 0.139,
+        "rainyDays": 294,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 48.63,
+        "avgDay": 0.081,
+        "rainyDays": 268,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 61.03,
+        "avgDay": 0.106,
+        "rainyDays": 282,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 68.4,
+        "avgDay": 0.114,
+        "rainyDays": 233,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 68.25,
+        "avgDay": 0.118,
+        "rainyDays": 244,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.6,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 3,
+        "below40": 51,
+        "avgTemp": 52.5,
+        "pct32": 0.5,
+        "pct40": 8.8
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 2,
+        "avgTemp": 62.5,
+        "pct32": 0.0,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.6,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 6,
+        "avgTemp": 59.6,
+        "pct32": 0.0,
+        "pct40": 1.0
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 40,
+        "below40": 152,
+        "avgTemp": 45.3,
+        "pct32": 7.3,
+        "pct40": 27.9
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 52,
+        "below40": 234,
+        "avgTemp": 43.0,
+        "pct32": 8.7,
+        "pct40": 39.1
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 9,
+        "below40": 53,
+        "avgTemp": 52.8,
+        "pct32": 1.5,
+        "pct40": 8.9
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 91.4,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.0
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 91.4,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.0
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 66.1,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.0
+      }
+    ]
+  },
+  {
+    "name": "Reveille - Marble Falls, TX",
+    "lat": 30.80024,
+    "lon": -98.33393,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 87.8,
+    "grade": "D",
+    "n_significant": 2,
+    "n_not_sig": 6,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 6,
+    "avg_p": 0.2465,
+    "avg_margin": 14.72,
+    "dom_conf": "90%",
+    "spring_total": 158.52,
+    "fall_total": 180.37,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 35.01,
+        "avgDay": 0.059,
+        "rainyDays": 194,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 35.43,
+        "avgDay": 0.065,
+        "rainyDays": 195,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 45.03,
+        "avgDay": 0.075,
+        "rainyDays": 260,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 60.05,
+        "avgDay": 0.104,
+        "rainyDays": 265,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 31.92,
+        "avgDay": 0.053,
+        "rainyDays": 259,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 51.98,
+        "avgDay": 0.09,
+        "rainyDays": 239,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 60.6,
+        "avgDay": 0.101,
+        "rainyDays": 223,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 52.44,
+        "avgDay": 0.091,
+        "rainyDays": 222,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 75.6,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 6,
+        "below40": 69,
+        "avgTemp": 50.6,
+        "pct32": 1.0,
+        "pct40": 11.9
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 4,
+        "avgTemp": 60.8,
+        "pct32": 0.0,
+        "pct40": 0.7
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.0,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 11,
+        "avgTemp": 58.0,
+        "pct32": 0.0,
+        "pct40": 1.9
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 66,
+        "below40": 197,
+        "avgTemp": 43.1,
+        "pct32": 12.1,
+        "pct40": 36.1
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 81,
+        "below40": 290,
+        "avgTemp": 40.8,
+        "pct32": 13.5,
+        "pct40": 48.5
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 15,
+        "below40": 67,
+        "avgTemp": 50.9,
+        "pct32": 2.5,
+        "pct40": 11.2
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 87.8,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 98.1
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 87.8,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 98.1
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 63.2,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 98.1
+      }
+    ]
+  },
+  {
+    "name": "South Austin Trail Network",
+    "lat": 30.217831,
+    "lon": -97.854558,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 89.9,
+    "grade": "C",
+    "n_significant": 4,
+    "n_not_sig": 4,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 4,
+    "avg_p": 0.1791,
+    "avg_margin": 22.58,
+    "dom_conf": "90%",
+    "spring_total": 194.16,
+    "fall_total": 229.29,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 41.47,
+        "avgDay": 0.069,
+        "rainyDays": 210,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 39.47,
+        "avgDay": 0.072,
+        "rainyDays": 224,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 49.21,
+        "avgDay": 0.082,
+        "rainyDays": 284,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 80.12,
+        "avgDay": 0.139,
+        "rainyDays": 295,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 47.08,
+        "avgDay": 0.079,
+        "rainyDays": 252,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 61.54,
+        "avgDay": 0.106,
+        "rainyDays": 279,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 70.47,
+        "avgDay": 0.118,
+        "rainyDays": 235,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 69.58,
+        "avgDay": 0.12,
+        "rainyDays": 233,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 75.9,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 5,
+        "below40": 53,
+        "avgTemp": 51.7,
+        "pct32": 0.9,
+        "pct40": 9.2
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 2,
+        "avgTemp": 61.7,
+        "pct32": 0.0,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.7,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 8,
+        "avgTemp": 58.8,
+        "pct32": 0.0,
+        "pct40": 1.4
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 48,
+        "below40": 166,
+        "avgTemp": 44.4,
+        "pct32": 8.8,
+        "pct40": 30.5
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 57,
+        "below40": 251,
+        "avgTemp": 42.2,
+        "pct32": 9.5,
+        "pct40": 42.0
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 10,
+        "below40": 53,
+        "avgTemp": 52.0,
+        "pct32": 1.7,
+        "pct40": 8.9
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 89.9,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.6
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 89.9,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.6
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 64.6,
+        "rain_score": 0,
+        "sig_score": 50.0,
+        "freeze_score": 98.6
+      }
+    ]
+  },
+  {
+    "name": "Sprocket Ranch",
+    "lat": 32.2450213929133,
+    "lon": -96.4068258715021,
+    "season": "Fall",
+    "best_month": "August",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of August",
+    "best_score": 95.0,
+    "grade": "A",
+    "n_significant": 1,
+    "n_not_sig": 7,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 7,
+    "avg_p": 0.3647,
+    "avg_margin": 17.28,
+    "dom_conf": "90%",
+    "spring_total": 244.27,
+    "fall_total": 218.37,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 50.14,
+        "avgDay": 0.084,
+        "rainyDays": 201,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 55.1,
+        "avgDay": 0.101,
+        "rainyDays": 212,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 68.87,
+        "avgDay": 0.115,
+        "rainyDays": 277,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 96.0,
+        "avgDay": 0.166,
+        "rainyDays": 291,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 37.54,
+        "avgDay": 0.063,
+        "rainyDays": 230,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 49.13,
+        "avgDay": 0.085,
+        "rainyDays": 231,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 81.64,
+        "avgDay": 0.137,
+        "rainyDays": 221,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 69.26,
+        "avgDay": 0.12,
+        "rainyDays": 225,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 77.5,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 10,
+        "below40": 80,
+        "avgTemp": 50.0,
+        "pct32": 1.7,
+        "pct40": 13.8
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 4,
+        "avgTemp": 60.4,
+        "pct32": 0.0,
+        "pct40": 0.7
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 70.9,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 12,
+        "avgTemp": 57.1,
+        "pct32": 0.0,
+        "pct40": 2.1
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 75,
+        "below40": 232,
+        "avgTemp": 41.8,
+        "pct32": 13.8,
+        "pct40": 42.6
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 110,
+        "below40": 325,
+        "avgTemp": 39.5,
+        "pct32": 18.4,
+        "pct40": 54.3
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 18,
+        "below40": 81,
+        "avgTemp": 49.8,
+        "pct32": 3.0,
+        "pct40": 13.5
+      }
+    ],
+    "top3": [
+      {
+        "month": "August",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "August",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      },
+      {
+        "month": "September",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 95.0,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 100.0
+      }
+    ]
+  },
+  {
+    "name": "Station Mountain",
+    "lat": 30.6564,
+    "lon": -98.3645,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 87.0,
+    "grade": "D",
+    "n_significant": 2,
+    "n_not_sig": 6,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 6,
+    "avg_p": 0.1593,
+    "avg_margin": 18.76,
+    "dom_conf": "90%",
+    "spring_total": 158.09,
+    "fall_total": 184.78,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 35.28,
+        "avgDay": 0.059,
+        "rainyDays": 192,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 35.36,
+        "avgDay": 0.065,
+        "rainyDays": 199,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 44.96,
+        "avgDay": 0.075,
+        "rainyDays": 259,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 59.48,
+        "avgDay": 0.103,
+        "rainyDays": 265,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 33.5,
+        "avgDay": 0.056,
+        "rainyDays": 250,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 54.4,
+        "avgDay": 0.094,
+        "rainyDays": 238,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 61.23,
+        "avgDay": 0.102,
+        "rainyDays": 222,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 52.36,
+        "avgDay": 0.09,
+        "rainyDays": 219,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 75.6,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 6,
+        "below40": 73,
+        "avgTemp": 50.1,
+        "pct32": 1.0,
+        "pct40": 12.6
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 3,
+        "avgTemp": 60.5,
+        "pct32": 0.2,
+        "pct40": 0.5
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 69.9,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 12,
+        "avgTemp": 57.8,
+        "pct32": 0.0,
+        "pct40": 2.1
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 63,
+        "below40": 210,
+        "avgTemp": 42.8,
+        "pct32": 11.6,
+        "pct40": 38.5
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 94,
+        "below40": 306,
+        "avgTemp": 40.3,
+        "pct32": 15.7,
+        "pct40": 51.2
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 17,
+        "below40": 76,
+        "avgTemp": 50.6,
+        "pct32": 2.8,
+        "pct40": 12.7
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 87.0,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 97.9
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 87.0,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 97.9
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 62.4,
+        "rain_score": 0,
+        "sig_score": 25.0,
+        "freeze_score": 97.9
+      }
+    ]
+  },
+  {
+    "name": "Sugarland - Houston SW, TX",
+    "lat": 29.566021,
+    "lon": -95.659236,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 92.8,
+    "grade": "B",
+    "n_significant": 1,
+    "n_not_sig": 7,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 7,
+    "avg_p": 0.3477,
+    "avg_margin": 20.59,
+    "dom_conf": "95%",
+    "spring_total": 248.53,
+    "fall_total": 284.41,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 69.32,
+        "avgDay": 0.116,
+        "rainyDays": 257,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 50.29,
+        "avgDay": 0.092,
+        "rainyDays": 268,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 56.43,
+        "avgDay": 0.094,
+        "rainyDays": 284,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 91.31,
+        "avgDay": 0.158,
+        "rainyDays": 274,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 65.1,
+        "avgDay": 0.109,
+        "rainyDays": 393,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 80.74,
+        "avgDay": 0.14,
+        "rainyDays": 347,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 78.26,
+        "avgDay": 0.131,
+        "rainyDays": 239,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 85.71,
+        "avgDay": 0.148,
+        "rainyDays": 267,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.5,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 3,
+        "below40": 30,
+        "avgTemp": 54.4,
+        "pct32": 0.5,
+        "pct40": 5.2
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 3,
+        "avgTemp": 63.7,
+        "pct32": 0.0,
+        "pct40": 0.5
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 72.1,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 3,
+        "avgTemp": 61.2,
+        "pct32": 0.0,
+        "pct40": 0.5
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 25,
+        "below40": 120,
+        "avgTemp": 48.0,
+        "pct32": 4.6,
+        "pct40": 22.0
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 39,
+        "below40": 181,
+        "avgTemp": 45.6,
+        "pct32": 6.5,
+        "pct40": 30.3
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 6,
+        "below40": 38,
+        "avgTemp": 54.6,
+        "pct32": 1.0,
+        "pct40": 6.4
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 92.8,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.5
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 92.8,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.5
+      },
+      {
+        "month": "March",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 71.1,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 93.6
+      }
+    ]
+  },
+  {
+    "name": "Troy - Waco, TX",
+    "lat": 31.198764,
+    "lon": -97.192601,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 88.5,
+    "grade": "C",
+    "n_significant": 1,
+    "n_not_sig": 7,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 7,
+    "avg_p": 0.5588,
+    "avg_margin": 8.56,
+    "dom_conf": "95%",
+    "spring_total": 205.7,
+    "fall_total": 216.64,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 45.19,
+        "avgDay": 0.076,
+        "rainyDays": 206,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 46.27,
+        "avgDay": 0.085,
+        "rainyDays": 206,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 58.04,
+        "avgDay": 0.097,
+        "rainyDays": 272,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 78.08,
+        "avgDay": 0.135,
+        "rainyDays": 282,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 40.1,
+        "avgDay": 0.067,
+        "rainyDays": 234,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 49.27,
+        "avgDay": 0.085,
+        "rainyDays": 231,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 78.54,
+        "avgDay": 0.131,
+        "rainyDays": 219,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 64.51,
+        "avgDay": 0.111,
+        "rainyDays": 227,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 77.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 6,
+        "below40": 63,
+        "avgTemp": 50.9,
+        "pct32": 1.0,
+        "pct40": 10.9
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 1,
+        "below40": 2,
+        "avgTemp": 61.3,
+        "pct32": 0.2,
+        "pct40": 0.3
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.2,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 10,
+        "avgTemp": 58.2,
+        "pct32": 0.0,
+        "pct40": 1.7
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 61,
+        "below40": 198,
+        "avgTemp": 43.2,
+        "pct32": 11.2,
+        "pct40": 36.3
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 83,
+        "below40": 286,
+        "avgTemp": 41.0,
+        "pct32": 13.9,
+        "pct40": 47.8
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 16,
+        "below40": 72,
+        "avgTemp": 51.1,
+        "pct32": 2.7,
+        "pct40": 12.0
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 88.5,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 98.3
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 88.5,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 98.3
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 63.9,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 98.3
+      }
+    ]
+  },
+  {
+    "name": "Waco - Giddings, TX",
+    "lat": 30.060778,
+    "lon": -96.90331,
+    "season": "Spring",
+    "best_month": "April",
+    "best_week": "Week 2 (8-14)",
+    "best_date": "2nd Weekend of April",
+    "best_score": 91.4,
+    "grade": "B",
+    "n_significant": 1,
+    "n_not_sig": 7,
+    "n_total": 8,
+    "is_star": false,
+    "symbol_count": 7,
+    "avg_p": 0.4771,
+    "avg_margin": 11.24,
+    "dom_conf": "90%",
+    "spring_total": 210.64,
+    "fall_total": 227.85,
+    "monthly_chart": [
+      {
+        "month": "January",
+        "season": "Spring",
+        "rain": 50.28,
+        "avgDay": 0.084,
+        "rainyDays": 231,
+        "totalDays": 598
+      },
+      {
+        "month": "February",
+        "season": "Spring",
+        "rain": 46.2,
+        "avgDay": 0.085,
+        "rainyDays": 246,
+        "totalDays": 545
+      },
+      {
+        "month": "March",
+        "season": "Spring",
+        "rain": 51.74,
+        "avgDay": 0.087,
+        "rainyDays": 292,
+        "totalDays": 598
+      },
+      {
+        "month": "April",
+        "season": "Spring",
+        "rain": 79.07,
+        "avgDay": 0.137,
+        "rainyDays": 288,
+        "totalDays": 578
+      },
+      {
+        "month": "August",
+        "season": "Fall",
+        "rain": 50.84,
+        "avgDay": 0.085,
+        "rainyDays": 305,
+        "totalDays": 598
+      },
+      {
+        "month": "September",
+        "season": "Fall",
+        "rain": 59.06,
+        "avgDay": 0.102,
+        "rainyDays": 305,
+        "totalDays": 578
+      },
+      {
+        "month": "October",
+        "season": "Fall",
+        "rain": 71.12,
+        "avgDay": 0.119,
+        "rainyDays": 232,
+        "totalDays": 598
+      },
+      {
+        "month": "November",
+        "season": "Fall",
+        "rain": 68.57,
+        "avgDay": 0.118,
+        "rainyDays": 247,
+        "totalDays": 579
+      }
+    ],
+    "freeze": [
+      {
+        "season": "Fall",
+        "month": "August",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 76.8,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Fall",
+        "month": "November",
+        "below32": 3,
+        "below40": 48,
+        "avgTemp": 52.8,
+        "pct32": 0.5,
+        "pct40": 8.3
+      },
+      {
+        "season": "Fall",
+        "month": "October",
+        "below32": 0,
+        "below40": 3,
+        "avgTemp": 62.6,
+        "pct32": 0.0,
+        "pct40": 0.5
+      },
+      {
+        "season": "Fall",
+        "month": "September",
+        "below32": 0,
+        "below40": 0,
+        "avgTemp": 71.8,
+        "pct32": 0.0,
+        "pct40": 0.0
+      },
+      {
+        "season": "Spring",
+        "month": "April",
+        "below32": 0,
+        "below40": 5,
+        "avgTemp": 59.8,
+        "pct32": 0.0,
+        "pct40": 0.9
+      },
+      {
+        "season": "Spring",
+        "month": "February",
+        "below32": 38,
+        "below40": 150,
+        "avgTemp": 45.6,
+        "pct32": 7.0,
+        "pct40": 27.5
+      },
+      {
+        "season": "Spring",
+        "month": "January",
+        "below32": 57,
+        "below40": 224,
+        "avgTemp": 43.3,
+        "pct32": 9.5,
+        "pct40": 37.5
+      },
+      {
+        "season": "Spring",
+        "month": "March",
+        "below32": 12,
+        "below40": 50,
+        "avgTemp": 53.0,
+        "pct32": 2.0,
+        "pct40": 8.4
+      }
+    ],
+    "top3": [
+      {
+        "month": "April",
+        "week_key": "Week 2 (8-14)",
+        "week_label": "2nd Weekend",
+        "score": 91.4,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.1
+      },
+      {
+        "month": "April",
+        "week_key": "Week 3 (15-21)",
+        "week_label": "3rd Weekend",
+        "score": 91.4,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.1
+      },
+      {
+        "month": "April",
+        "week_key": "Week 1 (1-7)",
+        "week_label": "1st Weekend",
+        "score": 66.8,
+        "rain_score": 0,
+        "sig_score": 12.5,
+        "freeze_score": 99.1
+      }
+    ]
+  }
+];
+
+const map = L.map('map', { zoomControl: true }).setView([31.5, -97.5], 7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+let activeMarkers = [];
+let selectedName  = null;
+
+function switchTab(tab) {
+  document.getElementById('tab-summary').classList.toggle('active', tab === 'summary');
+  document.getElementById('tab-legend').classList.toggle('active',  tab === 'legend');
+  document.getElementById('panel-summary').style.display = tab === 'summary' ? '' : 'none';
+  document.getElementById('panel-legend').style.display  = tab === 'legend'  ? '' : 'none';
+}
+
+function getStarSize(conf) {
+  if (conf === "99%") return 40;
+  if (conf === "95%") return 31;
+  if (conf === "90%") return 23;
+  return 25;
+}
+
+function getColor(season, isStar, avgMargin) {
+  const t = Math.min(avgMargin / 60, 1);
+  if (season === "Spring") {
+    if (isStar) {
+      const r = Math.round(168 - 142 * t);
+      const g = Math.round(219 - 61  * t);
+      const b = Math.round(181 - 161 * t);
+      return `rgb(${r},${g},${b})`;
+    }
+    return "#a8ddb5";
+  } else {
+    if (isStar) {
+      const r = Math.round(244 - 105 * t);
+      const g = Math.round(184 - 120 * t);
+      const b = Math.round(122 - 122 * t);
+      return `rgb(${r},${g},${b})`;
+    }
+    return "#f4b87a";
+  }
+}
+
+function makeSVG(isStar, color, count, size) {
+  const h  = size / 2;
+  const r  = h * 0.8;
+  const fs = Math.max(size * 0.28, 9);
+  if (isStar) {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const a  = (i * Math.PI / 5) - Math.PI / 2;
+      const rr = i % 2 === 0 ? r : r * 0.42;
+      pts.push(`${h + rr * Math.cos(a)},${h + rr * Math.sin(a)}`);
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <polygon points="${pts.join(' ')}" fill="${color}" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+      <text x="${h}" y="${h + fs*0.38}" text-anchor="middle" font-size="${fs}" font-family="DM Sans,sans-serif" font-weight="600" fill="white">${count}</text>
+    </svg>`;
+  } else {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${h}" cy="${h}" r="${r}" fill="${color}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+      <text x="${h}" y="${h + fs*0.38}" text-anchor="middle" font-size="${fs}" font-family="DM Sans,sans-serif" font-weight="600" fill="rgba(0,0,0,0.75)">${count}</text>
+    </svg>`;
+  }
+}
+
+function miniTooltip(d) {
+  const sc = d.season === 'Spring' ? 'var(--spring-mid)' : 'var(--fall-mid)';
+  return `<div class="mini-tooltip" onclick="showSummary('${d.name.replace(/'/g,"\\'")}')">
+    <div class="mini-tt-name" style="color:${sc}">${d.name}</div>
+    <div class="mini-tt-row"><span class="mini-tt-lbl">Best Race Date</span><span>${d.best_date}</span></div>
+    <div class="mini-tt-row"><span class="mini-tt-lbl">Score / Grade</span><span>${d.best_score} / ${d.grade}</span></div>
+    <div class="mini-tt-row"><span class="mini-tt-lbl">Driest Season</span><span>${d.season}</span></div>
+    <div class="mini-tt-row"><span class="mini-tt-lbl">Sig Windows</span><span>${d.n_significant} / ${d.n_total}</span></div>
+    <div class="mini-tt-click">Click for full summary</div>
+  </div>`;
+}
+
+function showSummary(name) {
+  selectedName = name;
+  const d = DATA.find(x => x.name === name);
+  if (!d) return;
+
+  switchTab('summary');
+  map.closePopup();
+
+  const sc     = d.season === 'Spring' ? 'spring' : 'fall';
+  const scColor = d.season === 'Spring' ? 'var(--spring-mid)' : 'var(--fall-mid)';
+  const pctSig = Math.round((d.n_significant / d.n_total) * 100);
+
+  // Monthly bar chart
+  let maxRain = 0;
+  if (d.monthly_chart) d.monthly_chart.forEach(m => { if (m.rain > maxRain) maxRain = m.rain; });
+  if (maxRain === 0) maxRain = 1;
+
+  let barsHTML = '';
+  if (d.monthly_chart && d.monthly_chart.length > 0) {
+    d.monthly_chart.forEach(m => {
+      const h   = Math.round((m.rain / maxRain) * 70);
+      const col = m.season === 'Spring' ? 'var(--spring-mid)' : 'var(--fall-mid)';
+      const tip = `${m.month}: ${m.rain}in (${m.rainyDays}/${m.totalDays} days)`;
+      barsHTML += `<div class="bar-wrap">
+        <div class="bar" style="height:${h}px;background:${col}" data-tip="${tip}"></div>
+        <div class="bar-month">${m.month.substring(0,3)}</div>
+      </div>`;
+    });
+  }
+
+  // Top 3 race dates
+  let top3HTML = '';
+  if (d.top3 && d.top3.length > 0) {
+    const medals = ['1st','2nd','3rd'];
+    d.top3.forEach((t, i) => {
+      const bColor = d.season === 'Spring' ? 'var(--spring-mid)' : 'var(--fall-mid)';
+      const bPct   = Math.round(t.score);
+      top3HTML += `<div class="top3-item">
+        <div class="top3-rank">${medals[i]||i+1}</div>
+        <div class="top3-info">
+          <div class="top3-date">${t.week_label} of ${t.month}</div>
+          <div class="top3-score">Score: ${t.score} | Rain: ${t.rain_score} | Freeze: ${t.freeze_score}</div>
+        </div>
+        <div>
+          <div class="top3-bar"><div class="top3-bar-fill" style="width:${bPct}%;background:${bColor}"></div></div>
+        </div>
+      </div>`;
+    });
+  }
+
+  // Freeze table
+  let freezeHTML = '';
+  if (d.freeze && d.freeze.length > 0) {
+    freezeHTML = `<div class="section-title">Freeze Risk by Month</div>
+    <table class="freeze-table">
+      <tr><th>Month</th><th>Season</th><th>&lt;32F</th><th>&lt;40F</th><th>Avg Low</th></tr>`;
+    d.freeze.forEach(f => {
+      const c32 = f.pct32 > 20 ? '#ff6b6b' : f.pct32 > 5 ? '#ffa94d' : '#69db7c';
+      const c40 = f.pct40 > 40 ? '#ffa94d' : f.pct40 > 15 ? '#ffe066' : '#69db7c';
+      freezeHTML += `<tr>
+        <td>${f.month}</td>
+        <td>${f.season}</td>
+        <td style="color:${c32}">${f.below32}d (${f.pct32}%)</td>
+        <td style="color:${c40}">${f.below40}d (${f.pct40}%)</td>
+        <td>${f.avgTemp}F</td>
+      </tr>`;
+    });
+    freezeHTML += `</table>`;
+  }
+
+  document.getElementById('panel-summary').innerHTML = `
+    <div class="venue-summary">
+      <div class="vs-name ${sc}">${d.name}</div>
+
+      <div class="score-block">
+        <div class="grade-circle grade-${d.grade}">${d.grade}</div>
+        <div class="score-info">
+          <div class="score-num">${d.best_score}<span style="font-size:0.7rem;color:var(--muted);font-weight:400"> / 100</span></div>
+          <div class="score-label">Race Suitability Score</div>
+          <div class="best-date-banner" style="color:${scColor}">
+            Best Date: <span class="best-date-val">${d.best_date}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-cell">
+          <div class="stat-cell-label">Driest Season</div>
+          <div class="stat-cell-val" style="color:${scColor}">${d.season}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Best Month</div>
+          <div class="stat-cell-val">${d.best_month}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Spring Total</div>
+          <div class="stat-cell-val">${d.spring_total} in</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Fall Total</div>
+          <div class="stat-cell-val">${d.fall_total} in</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Avg Margin</div>
+          <div class="stat-cell-val">${d.avg_margin} in</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-cell-label">Avg P-Value</div>
+          <div class="stat-cell-val">${d.avg_p ?? 'N/A'}</div>
+        </div>
+      </div>
+
+      <div class="sig-bar-wrap">
+        <div class="sig-bar-label">
+          <span>Significant in ${d.n_significant} of ${d.n_total} cascade windows</span>
+          <span>${pctSig}%</span>
+        </div>
+        <div class="sig-bar">
+          <div class="sig-bar-fill" style="width:${pctSig}%;background:${scColor}"></div>
+        </div>
+      </div>
+
+      <div class="section-title">Top 3 Race Date Windows</div>
+      <div class="top3-list">${top3HTML}</div>
+
+      ${barsHTML ? `<div class="section-title">Monthly Rainfall (Weekend Days)</div>
+      <div class="bar-chart">${barsHTML}</div>` : ''}
+
+      ${freezeHTML}
+    </div>`;
+}
+
+function applyFilters() {
+  const fSeason = document.getElementById('f-season').value;
+  const fSym    = document.getElementById('f-sym').value;
+  const fMinSig = parseInt(document.getElementById('f-minsig').value);
+  const fConf   = document.getElementById('f-conf').value;
+  const fScore  = parseInt(document.getElementById('f-score').value);
+  const confOrd = { "99%": 3, "95%": 2, "90%": 1, "N/A": 0 };
+
+  activeMarkers.forEach(m => map.removeLayer(m));
+  activeMarkers = [];
+
+  let shown = 0;
+  DATA.forEach(d => {
+    if (fSeason !== 'all' && d.season !== fSeason) return;
+    if (fSym === 'star'   && !d.is_star) return;
+    if (fSym === 'circle' &&  d.is_star) return;
+    if (d.n_significant < fMinSig) return;
+    if (fScore > 0 && d.best_score < fScore) return;
+    if (fConf !== 'all') {
+      const need = confOrd[fConf] || 0;
+      const have = confOrd[d.dom_conf] || 0;
+      if (have < need) return;
+    }
+
+    const size  = d.is_star ? getStarSize(d.dom_conf) : 26;
+    const color = getColor(d.season, d.is_star, d.avg_margin);
+    const svg   = makeSVG(d.is_star, color, d.symbol_count, size);
+    const icon  = L.divIcon({ html: svg, iconSize: [size, size], iconAnchor: [size/2, size/2], className: '' });
+
+    const marker = L.marker([d.lat, d.lon], { icon })
+      .bindPopup(miniTooltip(d), { maxWidth: 260, className: 'custom-popup' })
+      .on('click', function() {
+        showSummary(d.name);
+      });
+
+    marker.addTo(map);
+    activeMarkers.push(marker);
+    shown++;
+  });
+
+  const pill = document.getElementById('count-pill');
+  pill.textContent = shown === DATA.length
+    ? `All ${shown} locations`
+    : `${shown} of ${DATA.length} locations`;
+}
+
+applyFilters();
+</script>
+</body>
+</html>
