@@ -169,6 +169,12 @@ header h1{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2p
         <option value="3rd Wknd">3rd Wknd</option>
         <option value="4th Wknd">4th Wknd</option>
       </select></div>
+    <div class="fg"><label>Force To</label>
+      <select id="f-forceto" onchange="applyFilters()">
+        <option value="none">— None —</option>
+        <option value="Spring">Spring</option>
+        <option value="Fall">Fall</option>
+      </select></div>
     <div class="count-pill" id="count-pill">All locations</div>
   </div>
 </header>
@@ -214,6 +220,15 @@ header h1{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2p
             <strong style="color:#58a6ff">B</strong> = Next 25%<br>
             <strong style="color:#ffa600">C</strong> = Next 25%<br>
             <strong style="color:#ff5050">D</strong> = Bottom 25%
+          </div>
+        </div>
+        <div class="leg-section"><h4>Notes</h4>
+          <div class="leg-note">
+            <ul style="margin:0;padding-left:16px;line-height:1.8;">
+              <li>Venues that are circles are not significantally different from spring to fall when considering rain, heat, and cold.</li>
+              <li>Venues listed as spring/fall may have recommended months that are not within their prime season</li>
+              <li>Heat removes August and September from all consideration</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -20123,6 +20138,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
 }).addTo(map);
 
 let activeMarkers=[];
+let currentSummaryName=null;
 
 function switchTab(tab){
   document.getElementById('tab-summary').classList.toggle('active',tab==='summary');
@@ -20247,6 +20263,7 @@ function miniTooltip(d){
 function showSummary(name){
   const d=DATA.find(x=>x.name===name);
   if(!d)return;
+  currentSummaryName=name;
   switchTab('summary');
   map.closePopup();
 
@@ -20268,11 +20285,18 @@ function showSummary(name){
     });
   }
 
+  // Force To — scope top3 and table to a specific season if forced
+  const fForceTo=document.getElementById('f-forceto').value;
+  const visScores=fForceTo==='none'
+    ? d.week_scores
+    : d.week_scores.filter(w=>w.season===fForceTo);
+  const visTop3=visScores.slice(0,3);
+
   // Top 3 race date windows
   const medals=['1st','2nd','3rd'];
   let top3HTML='';
-  if(d.top3&&d.top3.length>0){
-    d.top3.forEach((t,i)=>{
+  if(visTop3.length>0){
+    visTop3.forEach((t,i)=>{
       const dqClass=t.disqualified?' dq':'';
       const dqTag=t.disqualified?' <span style="color:#ff5050;font-size:0.6rem">[DQ]</span>':'';
       const scoreColor=t.disqualified?'#ff5050':gc;
@@ -20286,15 +20310,18 @@ function showSummary(name){
         <div class="top3-score-val" style="color:${scoreColor}">${t.score}</div>
       </div>`;
     });
+  } else {
+    top3HTML=`<div style="color:var(--muted);font-size:0.75rem;padding:8px 0">No windows for selected season.</div>`;
   }
 
-  // Full week table — all weeks sorted by score
+  // Full week table — filtered by season, sorted by score
+  const seasonLabel=fForceTo==='none'?'All Race Windows (scored)':fForceTo+' Race Windows (scored)';
   let weekTableHTML='';
-  if(d.week_scores&&d.week_scores.length>0){
-    weekTableHTML=`<div class="section-title">All Race Windows (scored)</div>
+  if(visScores.length>0){
+    weekTableHTML=`<div class="section-title">${seasonLabel}</div>
     <table class="week-table">
       <tr><th>Week</th><th>Month</th><th>Score</th><th>Rain%</th><th>90F+%</th><th>100F+%</th><th>&lt;32F%</th><th>&lt;24F%</th><th>LoF</th><th>HiF</th></tr>`;
-    d.week_scores.forEach((w,i)=>{
+    visScores.forEach((w,i)=>{
       const dqClass=w.disqualified?'dq':'';
       const bestClass=i===0&&!w.disqualified?'best':'';
       const rc=w.pct_rainy>30?'#ff6b6b':w.pct_rainy>15?'#ffa94d':'';
@@ -20393,6 +20420,7 @@ function applyFilters(){
 
   document.getElementById('count-pill').textContent=
     shown===DATA.length?`All ${shown} locations`:`${shown} of ${DATA.length} locations`;
+  if(currentSummaryName)showSummary(currentSummaryName);
 }
 
 buildLocDD();
