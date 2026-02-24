@@ -84,6 +84,15 @@ header h1{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2p
 .week-table td{padding:4px 5px;border-bottom:1px solid rgba(48,54,61,0.5);}
 .week-table tr.dq td{opacity:0.45;color:#ff5050;}
 .week-table tr.best td{background:rgba(88,166,255,0.07);}
+.ms-wrap{position:relative;}
+.ms-btn{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px 22px 4px 8px;border-radius:4px;font-family:'DM Sans',sans-serif;font-size:0.78rem;cursor:pointer;min-width:72px;text-align:left;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
+.ms-btn::after{content:'▾';position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:0.7rem;color:var(--muted);}
+.ms-dd{display:none;position:absolute;top:calc(100% + 3px);left:0;background:var(--panel);border:1px solid var(--border);border-radius:4px;z-index:9999;min-width:150px;max-height:240px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
+.ms-dd.open{display:block;}
+.ms-opt{display:flex;align-items:center;gap:7px;padding:5px 10px;font-size:0.75rem;cursor:pointer;color:var(--text);user-select:none;}
+.ms-opt:hover{background:var(--panel2);}
+.ms-opt input[type=checkbox]{cursor:pointer;accent-color:var(--accent);margin:0;flex-shrink:0;}
+.ms-divider{border-bottom:1px solid var(--border);margin:2px 0;}
 ::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 .leaflet-popup-content-wrapper{background:transparent!important;box-shadow:none!important;padding:0!important;}
 .leaflet-popup-tip-container{display:none;}
@@ -113,17 +122,52 @@ header h1{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:2p
       </select></div>
     <div class="fg"><label>Min Sig Windows</label>
       <select id="f-minsig" onchange="applyFilters()">
-        <option value="0">Any</option>
-        <option value="3">3+ windows</option>
-        <option value="5">5+ windows</option>
         <option value="8">8+ windows</option>
+        <option value="7">7+ windows</option>
+        <option value="6">6+ windows</option>
+        <option value="5">5+ windows</option>
+        <option value="4">4+ windows</option>
+        <option value="3">3+ windows</option>
+        <option value="2">2+ windows</option>
+        <option value="1">1+ windows</option>
+        <option value="0" selected>Any</option>
       </select></div>
     <div class="fg"><label>Grade</label>
-      <select id="f-grade" onchange="applyFilters()">
-        <option value="all">All Grades</option>
-        <option value="A">A only</option>
-        <option value="AB">A and B</option>
-        <option value="ABC">A, B and C</option>
+      <div class="ms-wrap">
+        <button class="ms-btn" id="f-grade-btn" onclick="msTog('f-grade')">All</button>
+        <div class="ms-dd" id="f-grade-dd">
+          <label class="ms-opt"><input type="checkbox" value="__all" id="f-grade-all" checked onchange="msAll('f-grade')"> All</label>
+          <div class="ms-divider"></div>
+          <label class="ms-opt"><input type="checkbox" value="A" checked onchange="msChg('f-grade')"> A</label>
+          <label class="ms-opt"><input type="checkbox" value="B" checked onchange="msChg('f-grade')"> B</label>
+          <label class="ms-opt"><input type="checkbox" value="C" checked onchange="msChg('f-grade')"> C</label>
+          <label class="ms-opt"><input type="checkbox" value="D" checked onchange="msChg('f-grade')"> D</label>
+        </div>
+      </div></div>
+    <div class="fg"><label>Location</label>
+      <div class="ms-wrap">
+        <button class="ms-btn" id="f-loc-btn" onclick="msTog('f-loc')">All</button>
+        <div class="ms-dd" id="f-loc-dd"></div>
+      </div></div>
+    <div class="fg"><label>Month</label>
+      <select id="f-month" onchange="applyFilters()">
+        <option value="any">Any Month</option>
+        <option value="January">January</option>
+        <option value="February">February</option>
+        <option value="March">March</option>
+        <option value="April">April</option>
+        <option value="August">August</option>
+        <option value="September">September</option>
+        <option value="October">October</option>
+        <option value="November">November</option>
+      </select></div>
+    <div class="fg"><label>Week</label>
+      <select id="f-week" onchange="applyFilters()">
+        <option value="any">Any Week</option>
+        <option value="1st Wknd">1st Wknd</option>
+        <option value="2nd Wknd">2nd Wknd</option>
+        <option value="3rd Wknd">3rd Wknd</option>
+        <option value="4th Wknd">4th Wknd</option>
       </select></div>
     <div class="count-pill" id="count-pill">All locations</div>
   </div>
@@ -878,7 +922,7 @@ const DATA = [
     "n_not_sig": 8,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 8,
+    "symbol_count": 0,
     "avg_p": 0.6588,
     "avg_margin": 6.16,
     "dom_conf": "N/A",
@@ -2936,7 +2980,7 @@ const DATA = [
     "n_not_sig": 8,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 8,
+    "symbol_count": 0,
     "avg_p": 0.4376,
     "avg_margin": 12.05,
     "dom_conf": "N/A",
@@ -3622,7 +3666,7 @@ const DATA = [
     "n_not_sig": 8,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 8,
+    "symbol_count": 0,
     "avg_p": 0.6047,
     "avg_margin": 6.38,
     "dom_conf": "N/A",
@@ -4308,7 +4352,7 @@ const DATA = [
     "n_not_sig": 8,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 8,
+    "symbol_count": 0,
     "avg_p": 0.5582,
     "avg_margin": 7.49,
     "dom_conf": "N/A",
@@ -6366,7 +6410,7 @@ const DATA = [
     "n_not_sig": 8,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 8,
+    "symbol_count": 0,
     "avg_p": 0.5927,
     "avg_margin": 7.12,
     "dom_conf": "N/A",
@@ -7052,7 +7096,7 @@ const DATA = [
     "n_not_sig": 7,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 7,
+    "symbol_count": 1,
     "avg_p": 0.6036,
     "avg_margin": 9.08,
     "dom_conf": "90%",
@@ -7738,7 +7782,7 @@ const DATA = [
     "n_not_sig": 8,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 8,
+    "symbol_count": 0,
     "avg_p": 0.6439,
     "avg_margin": 6.44,
     "dom_conf": "N/A",
@@ -8424,7 +8468,7 @@ const DATA = [
     "n_not_sig": 6,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 6,
+    "symbol_count": 2,
     "avg_p": 0.1883,
     "avg_margin": 15.95,
     "dom_conf": "95%",
@@ -10482,7 +10526,7 @@ const DATA = [
     "n_not_sig": 7,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 7,
+    "symbol_count": 1,
     "avg_p": 0.632,
     "avg_margin": 7.3,
     "dom_conf": "90%",
@@ -11854,7 +11898,7 @@ const DATA = [
     "n_not_sig": 5,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 5,
+    "symbol_count": 3,
     "avg_p": 0.1907,
     "avg_margin": 20.03,
     "dom_conf": "90%",
@@ -13912,7 +13956,7 @@ const DATA = [
     "n_not_sig": 8,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 8,
+    "symbol_count": 0,
     "avg_p": 0.5039,
     "avg_margin": 8.85,
     "dom_conf": "N/A",
@@ -14598,7 +14642,7 @@ const DATA = [
     "n_not_sig": 7,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 7,
+    "symbol_count": 1,
     "avg_p": 0.3707,
     "avg_margin": 13.52,
     "dom_conf": "90%",
@@ -15284,7 +15328,7 @@ const DATA = [
     "n_not_sig": 6,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 6,
+    "symbol_count": 2,
     "avg_p": 0.2465,
     "avg_margin": 14.72,
     "dom_conf": "90%",
@@ -16656,7 +16700,7 @@ const DATA = [
     "n_not_sig": 7,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 7,
+    "symbol_count": 1,
     "avg_p": 0.3647,
     "avg_margin": 17.28,
     "dom_conf": "90%",
@@ -17342,7 +17386,7 @@ const DATA = [
     "n_not_sig": 6,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 6,
+    "symbol_count": 2,
     "avg_p": 0.1593,
     "avg_margin": 18.76,
     "dom_conf": "90%",
@@ -18028,7 +18072,7 @@ const DATA = [
     "n_not_sig": 7,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 7,
+    "symbol_count": 1,
     "avg_p": 0.3477,
     "avg_margin": 20.59,
     "dom_conf": "95%",
@@ -18714,7 +18758,7 @@ const DATA = [
     "n_not_sig": 7,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 7,
+    "symbol_count": 1,
     "avg_p": 0.5588,
     "avg_margin": 8.56,
     "dom_conf": "95%",
@@ -19400,7 +19444,7 @@ const DATA = [
     "n_not_sig": 7,
     "n_total": 8,
     "is_star": false,
-    "symbol_count": 7,
+    "symbol_count": 1,
     "avg_p": 0.4771,
     "avg_margin": 11.24,
     "dom_conf": "90%",
@@ -20134,6 +20178,59 @@ function abbrevMonth(m){
   return map[m]||m;
 }
 
+// ── Multi-select helpers ─────────────────────────────────────────
+function msTog(id){
+  const dd=document.getElementById(id+'-dd');
+  const isOpen=dd.classList.contains('open');
+  document.querySelectorAll('.ms-dd').forEach(d=>d.classList.remove('open'));
+  if(!isOpen)dd.classList.add('open');
+}
+
+function msVals(id){
+  return [...document.querySelectorAll(`#${id}-dd input[type=checkbox]:not([value="__all"])`)]
+    .filter(x=>x.checked).map(x=>x.value);
+}
+
+function msUpdBtn(id){
+  const opts=[...document.querySelectorAll(`#${id}-dd input[type=checkbox]:not([value="__all"])`)];
+  const checked=opts.filter(x=>x.checked);
+  const allCb=document.getElementById(id+'-all');
+  if(allCb)allCb.checked=checked.length===opts.length;
+  const btn=document.getElementById(id+'-btn');
+  if(checked.length===opts.length||opts.length===0)btn.textContent='All';
+  else if(checked.length===0)btn.textContent='None';
+  else if(id==='f-grade')btn.textContent=checked.map(x=>x.value).join(', ');
+  else btn.textContent=checked.length+' selected';
+}
+
+function msAll(id){
+  const allCb=document.getElementById(id+'-all');
+  document.querySelectorAll(`#${id}-dd input[type=checkbox]:not([value="__all"])`).forEach(cb=>{cb.checked=allCb.checked;});
+  msUpdBtn(id);applyFilters();
+}
+
+function msChg(id){msUpdBtn(id);applyFilters();}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.ms-wrap'))document.querySelectorAll('.ms-dd').forEach(d=>d.classList.remove('open'));
+});
+
+function buildLocDD(){
+  const dd=document.getElementById('f-loc-dd');
+  dd.innerHTML='<label class="ms-opt"><input type="checkbox" value="__all" id="f-loc-all" checked onchange="msAll(\'f-loc\')"> All</label><div class="ms-divider"></div>';
+  DATA.forEach(d=>{
+    const lbl=document.createElement('label');
+    lbl.className='ms-opt';
+    const cb=document.createElement('input');
+    cb.type='checkbox';cb.value=d.name;cb.checked=true;
+    cb.addEventListener('change',()=>msChg('f-loc'));
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode('\u00a0'+d.name));
+    dd.appendChild(lbl);
+  });
+}
+// ────────────────────────────────────────────────────────────────
+
 function miniTooltip(d){
   const sc=d.season==='Spring'?'var(--spring-mid)':'var(--fall-mid)';
   const gc=gradeColor(d.grade);
@@ -20255,7 +20352,10 @@ function applyFilters(){
   const fSeason=document.getElementById('f-season').value;
   const fSym=document.getElementById('f-sym').value;
   const fMinSig=parseInt(document.getElementById('f-minsig').value);
-  const fGrade=document.getElementById('f-grade').value;
+  const selGrades=msVals('f-grade');
+  const selLocs=msVals('f-loc');
+  const fMonth=document.getElementById('f-month').value;
+  const fWeek=document.getElementById('f-week').value;
 
   activeMarkers.forEach(m=>map.removeLayer(m));
   activeMarkers=[];
@@ -20266,9 +20366,16 @@ function applyFilters(){
     if(fSym==='star'&&!d.is_star)return;
     if(fSym==='circle'&&d.is_star)return;
     if(d.n_significant<fMinSig)return;
-    if(fGrade==='A'&&d.grade!=='A')return;
-    if(fGrade==='AB'&&!['A','B'].includes(d.grade))return;
-    if(fGrade==='ABC'&&!['A','B','C'].includes(d.grade))return;
+    if(selGrades.length>0&&selGrades.length<4&&!selGrades.includes(d.grade))return;
+    if(selLocs.length>0&&selLocs.length<DATA.length&&!selLocs.includes(d.name))return;
+    if(fMonth!=='any'){
+      const monthMatch=d.best_month===fMonth||(d.top3&&d.top3.some(t=>t.month===fMonth));
+      if(!monthMatch)return;
+    }
+    if(fWeek!=='any'){
+      const weekMatch=d.top3&&d.top3.some(t=>t.week_label===fWeek);
+      if(!weekMatch)return;
+    }
 
     const size=d.is_star?getStarSize(d.dom_conf):26;
     const color=getColor(d.season,d.is_star,d.avg_margin);
@@ -20288,6 +20395,7 @@ function applyFilters(){
     shown===DATA.length?`All ${shown} locations`:`${shown} of ${DATA.length} locations`;
 }
 
+buildLocDD();
 applyFilters();
 </script>
 </body>
